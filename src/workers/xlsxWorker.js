@@ -54,24 +54,18 @@ self.onmessage = (e) => {
       
       // Allow other operations to run
       if (i % (CHUNK_SIZE * 10) === 0) {
-        await new Promise(resolve => setTimeout(resolve, 1))
+        // Use setTimeout instead of await for better compatibility
+        setTimeout(() => {}, 1)
       }
     }
     
-    // Final progress update
-    self.postMessage({ 
-      type: 'chunk', 
-      rows: [],
-      progress: 100
-    })
-    
-    // Small delay before completion
+    // Complete immediately after processing all chunks
     setTimeout(() => {
       self.postMessage({ 
         type: 'done',
         totalRows: json.length
       })
-    }, 100)
+    }, 50)
     
   } catch (error) {
     self.postMessage({ 

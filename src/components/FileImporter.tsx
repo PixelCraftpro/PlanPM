@@ -95,6 +95,11 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
           clearTimeout(timeoutRef.current)
         }
         
+        if (workerRef.current) {
+          workerRef.current.terminate()
+          workerRef.current = null
+        }
+        
         setImportProgress(prev => ({
           ...prev,
           progress: 100,
@@ -116,6 +121,11 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
           clearTimeout(timeoutRef.current)
         }
         
+        if (workerRef.current) {
+          workerRef.current.terminate()
+          workerRef.current = null
+        }
+        
         console.error('Import error:', errorMessage)
         alert(`Błąd importu: ${errorMessage}`)
         resetImportProgress()
@@ -133,6 +143,8 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
 
       workerRef.current.onmessage = (e) => {
         const { type, rows, progress, totalRows, error } = e.data
+        
+        if (isCompleted) return
 
         if (type === 'chunk') {
           allRows.push(...rows)

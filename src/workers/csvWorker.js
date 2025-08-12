@@ -4,6 +4,7 @@ self.onmessage = async (e) => {
   const { file } = e.data
   
   let hasCompleted = false
+  let totalProcessed = 0
   
   Papa.parse(file, {
     header: true,
@@ -15,23 +16,25 @@ self.onmessage = async (e) => {
     chunk: (results, parser) => {
       if (hasCompleted) return
       
+      totalProcessed += results.data.length
+      
       self.postMessage({ 
         type: 'chunk', 
         rows: results.data,
-        progress: Math.min(100, (results.meta.cursor / file.size) * 100)
+        progress: Math.min(95, (results.meta.cursor / file.size) * 100)
       })
     },
     complete: (results) => {
       if (hasCompleted) return
       hasCompleted = true
       
-      // Small delay before completion
+      // Complete immediately
       setTimeout(() => {
         self.postMessage({ 
           type: 'done',
-          totalRows: results.data.length
+          totalRows: totalProcessed
         })
-      }, 100)
+      }, 10)
     },
     error: (error) => {
       if (hasCompleted) return

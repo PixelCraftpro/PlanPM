@@ -31,6 +31,8 @@ import { hashColor } from './utils/colorUtils'
 const parseDate = (dateStr: string): Date | null => {
   if (!dateStr) return null
   
+  console.log('🔍 Parsowanie daty:', dateStr)
+  
   // Try parsing as timestamp first
   const timestamp = parseInt(dateStr)
   if (!isNaN(timestamp) && timestamp > 1000000000) {
@@ -40,28 +42,39 @@ const parseDate = (dateStr: string): Date | null => {
   // Try ISO format
   try {
     const isoDate = parseISO(dateStr)
-    if (isValid(isoDate)) return isoDate
+    if (isValid(isoDate)) {
+      console.log('✅ Sparsowano jako ISO:', isoDate)
+      return isoDate
+    }
   } catch {}
   
   // Try various formats
   const formats = [
     'dd.MM.yyyy HH:mm',
+    'dd.MM.yyyy HH:mm:ss',
     'dd.MM.yyyy H:mm',
+    'dd.MM.yyyy H:mm:ss',
     'yyyy-MM-dd HH:mm',
     'yyyy-MM-dd H:mm',
     'dd/MM/yyyy HH:mm',
     'dd/MM/yyyy H:mm',
     'MM/dd/yyyy HH:mm',
-    'MM/dd/yyyy H:mm'
+    'MM/dd/yyyy H:mm',
+    'dd.MM.yyyy',
+    'yyyy-MM-dd'
   ]
   
   for (const formatStr of formats) {
     try {
       const parsed = parse(dateStr, formatStr, new Date())
-      if (isValid(parsed)) return parsed
+      if (isValid(parsed)) {
+        console.log(`✅ Sparsowano jako ${formatStr}:`, parsed)
+        return parsed
+      }
     } catch {}
   }
   
+  console.log('❌ Nie udało się sparsować daty:', dateStr)
   return null
 }
 
@@ -119,12 +132,28 @@ const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => 
     const product = row[columnMap.product] || ''
     const partNo = row[columnMap.partno] || ''
 
+    console.log(`📝 Przetwarzanie rekordu ${index + 1}:`, {
+      orderNo,
+      resource,
+      startTimeStr,
+      endTimeStr,
+      opNo
+    })
+
     if (!orderNo || !resource || !startTimeStr || !endTimeStr) return
 
     const startTime = parseDate(startTimeStr.toString())
     const endTime = parseDate(endTimeStr.toString())
 
-    if (!startTime || !endTime) return
+    if (!startTime || !endTime) {
+      console.log(`❌ Błąd parsowania dat dla rekordu ${index + 1}:`, {
+        startTimeStr,
+        endTimeStr,
+        startTime,
+        endTime
+      })
+      return
+    }
 
     parsedTasks.push({
       id: `${orderNo}-${opNo || index}`,
@@ -139,6 +168,7 @@ const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => 
     })
   })
   
+  console.log(`✅ Sparsowano ${parsedTasks.length} zadań z ${data.length} rekordów`)
   return parsedTasks
 }
 
@@ -169,12 +199,27 @@ const normalizeImportedDataLegacy = (data: any[]): Task[] => {
     const product = row[columnMap.product] || row['Product'] || row['Produkt'] || ''
     const partNo = row[columnMap.partno] || row['Part No.'] || row['Part No'] || row['Part Number'] || ''
 
+    console.log(`📝 Przetwarzanie rekordu legacy ${index + 1}:`, {
+      orderNo,
+      resource,
+      startTimeStr,
+      endTimeStr
+    })
+
     if (!orderNo || !resource || !startTimeStr || !endTimeStr) return
 
     const startTime = parseDate(startTimeStr.toString())
     const endTime = parseDate(endTimeStr.toString())
 
-    if (!startTime || !endTime) return
+    if (!startTime || !endTime) {
+      console.log(`❌ Błąd parsowania dat legacy dla rekordu ${index + 1}:`, {
+        startTimeStr,
+        endTimeStr,
+        startTime,
+        endTime
+      })
+      return
+    }
 
     parsedTasks.push({
       id: `${orderNo}-${opNo || index}`,
@@ -189,6 +234,7 @@ const normalizeImportedDataLegacy = (data: any[]): Task[] => {
     })
   })
   
+  console.log(`✅ Sparsowano legacy ${parsedTasks.length} zadań z ${data.length} rekordów`)
   return parsedTasks
 }
 

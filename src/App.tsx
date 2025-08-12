@@ -67,11 +67,14 @@ const parseDate = (dateStr: string): Date | null => {
 const normalizeColumnName = (name: string): string => {
   return name.toLowerCase()
     .replace(/[^a-z0-9]/g, '')
-    .replace(/^(order|id|nr|no).*/, 'orderno')
+    .replace(/^(order|id|nr|no|orderno).*/, 'orderno')
     .replace(/^(resource|maszyna|machine).*/, 'resource')
     .replace(/^(start|begin|początek).*/, 'starttime')
     .replace(/^(end|finish|koniec).*/, 'endtime')
     .replace(/^(qty|quantity|ilość|ilosc).*/, 'qty')
+    .replace(/^(op|operation|operacja).*/, 'opno')
+    .replace(/^(product|produkt).*/, 'product')
+    .replace(/^(part|partno|partnumber).*/, 'partno')
 }
 
 const normalizeImportedData = (data: any[]): Task[] => {
@@ -83,7 +86,7 @@ const normalizeImportedData = (data: any[]): Task[] => {
   
   Object.keys(firstRow).forEach(key => {
     const normalized = normalizeColumnName(key)
-    if (['orderno', 'resource', 'starttime', 'endtime', 'qty'].includes(normalized)) {
+    if (['orderno', 'resource', 'starttime', 'endtime', 'qty', 'opno', 'product', 'partno'].includes(normalized)) {
       columnMap[normalized] = key
     }
   })
@@ -91,11 +94,14 @@ const normalizeImportedData = (data: any[]): Task[] => {
   const parsedTasks: Task[] = []
   
   data.forEach((row, index) => {
-    const orderNo = row[columnMap.orderno] || row['Order No.'] || row['ID'] || ''
+    const orderNo = row[columnMap.orderno] || row['Order No.'] || row['Order No'] || row['ID'] || ''
     const resource = row[columnMap.resource] || row['Resource'] || row['Maszyna'] || ''
     const startTimeStr = row[columnMap.starttime] || row['Start Time'] || row['Start'] || ''
     const endTimeStr = row[columnMap.endtime] || row['End Time'] || row['End'] || ''
     const qtyStr = row[columnMap.qty] || row['Qty'] || row['Qty.'] || row['Ilość'] || ''
+    const opNo = row[columnMap.opno] || row['Op. No.'] || row['Op No'] || row['Operation'] || ''
+    const product = row[columnMap.product] || row['Product'] || row['Produkt'] || ''
+    const partNo = row[columnMap.partno] || row['Part No.'] || row['Part No'] || row['Part Number'] || ''
 
     if (!orderNo || !resource || !startTimeStr || !endTimeStr) return
 
@@ -105,12 +111,15 @@ const normalizeImportedData = (data: any[]): Task[] => {
     if (!startTime || !endTime) return
 
     parsedTasks.push({
-      id: `${index}`,
+      id: `${orderNo}-${opNo || index}`,
       orderNo: orderNo.toString(),
       resource: resource.toString(),
       startTime,
       endTime,
-      qty: qtyStr ? parseInt(qtyStr.toString()) : undefined
+      qty: qtyStr ? parseInt(qtyStr.toString()) : undefined,
+      opNo: opNo ? opNo.toString() : undefined,
+      product: product ? product.toString() : undefined,
+      partNo: partNo ? partNo.toString() : undefined
     })
   })
   
@@ -260,7 +269,19 @@ function GanttPlanner() {
         filtered = exactMatch
         
         // Create route connections
-        const sortedRoute = exactMatch.sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
+        const sortedRoute = exactMatch.sort((a, b) => {
+          // First try to sort by operation number
+          if (a.opNo && b.opNo) {
+            const opA = parseInt(a.opNo)
+            const opB = parseInt(b.opNo)
+            if (!isNaN(opA) && !isNaN(opB)) {
+              return opA - opB
+            }
+          }
+          // Fallback to start time
+          return a.startTime.getTime() - b.startTime.getTime()
+        })
+        
         const connections: RouteConnection[] = []
         for (let i = 0; i < sortedRoute.length - 1; i++) {
           connections.push({ from: sortedRoute[i], to: sortedRoute[i + 1] })
@@ -965,13 +986,169 @@ function GanttPlanner() {
                     
                     const fromX = ((connection.from.endTime.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60)) * zoomLevel
                     const toX = ((connection.to.startTime.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60)) * zoomLevel
-                    const fromY = fromResourceIndex * rowHeight + rowHeight / 2
-                    const toY = toResourceIndex * rowHeight + rowHeight / 2
                     
-                    const midX = (fromX + toX) / 2
+                    // Calculate Y position based on lane
+                    const fromLane = connection.from.lane || 0
+                    const toLane = connection.to.lane || 0
+                    const laneHeight = Math.floor(rowHeight / maxLanesPerResource)
+                    const fromY = fromResourceIndex * rowHeight + fromLane * laneHeight + laneHeight / 2
+                    const toY = toResourceIndex * rowHeight + toLane * laneHeight + laneHeight / 2
+                    
+                    // Create a more sophisticated connection path
+                    const controlOffset = Math.min(50, Math.abs(toX - fromX) * 0.3)
+                    const midX1 = fromX + controlOffset
+                    const midX2 = toX - controlOffset
                     
                     return (
-                      <path
+                      <g key={index}>
+                        {/* Connection line */}
+                        <path
+                          d={`M ${fromX} ${fromY} C ${midX1} ${fromY}, ${midX2} ${toY}, ${toX} ${toY}`}
+                          stroke={darkMode ? '#60a5fa' : '#3b82f6'}
+                          strokeWidth="2"
+                          strokeDasharray="5,5"
+                          fill="none"
+                          markerEnd="url(#arrowhead)"
+                        />
+                        {/* Connection points */}
+                        <circle
+                          cx={fromX}
+                          cy={fromY}
+                          r="3"
+                          fill={darkMode ? '#60a5fa' : '#3b82f6'}
+                        />
+                        <circle
+                          cx={toX}
+                          cy={toY}
+                          r="3"
+                          fill={darkMode ? '#60a5fa' : '#3b82f6'}
+                        />
+                      </g>
+                    )
+                  })}
+                  
+                  {/* Arrow marker definition */}
+                  <defs>
+                    <marker
+                      id="arrowhead"
+                      markerWidth="10"
+                      markerHeight="7"
+                      refX="9"
+                      refY="3.5"
+                      orient="auto"
+                      markerUnits="strokeWidth"
+                    >
+                      <polygon
+                        points="0 0, 10 3.5, 0 7"
+                        fill={darkMode ? '#60a5fa' : '#3b82f6'}
+                      />
+                    </marker>
+                  </defs>
+                </svg>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Task Details Popover */}
+      <AnimatePresence>
+        {selectedTask && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            onClick={() => setSelectedTask(null)}
+          >
+            <motion.div
+              className={`rounded-lg shadow-xl p-6 max-w-md w-full mx-4 ${
+                darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-lg font-semibold">Szczegóły zadania</h3>
+                <button
+                  onClick={() => setSelectedTask(null)}
+                  className={`p-1 rounded-lg transition-colors ${
+                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                  }`}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium opacity-70">Order No.</label>
+                  <div className="font-mono">{selectedTask.orderNo}</div>
+                </div>
+                {selectedTask.product && (
+                  <div>
+                    <label className="text-sm font-medium opacity-70">Produkt</label>
+                    <div>{selectedTask.product}</div>
+                  </div>
+                )}
+                {selectedTask.partNo && (
+                  <div>
+                    <label className="text-sm font-medium opacity-70">Part No.</label>
+                    <div className="font-mono">{selectedTask.partNo}</div>
+                  </div>
+                )}
+                {selectedTask.opNo && (
+                  <div>
+                    <label className="text-sm font-medium opacity-70">Op. No.</label>
+                    <div className="font-mono">{selectedTask.opNo}</div>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm font-medium opacity-70">Zasób</label>
+                  <div>{selectedTask.resource}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium opacity-70">Start</label>
+                  <div className="font-mono">{format(selectedTask.startTime, 'dd.MM.yyyy HH:mm', { locale: pl })}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium opacity-70">Koniec</label>
+                  <div className="font-mono">{format(selectedTask.endTime, 'dd.MM.yyyy HH:mm', { locale: pl })}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium opacity-70">Czas trwania</label>
+                  <div>{Math.round((selectedTask.endTime.getTime() - selectedTask.startTime.getTime()) / (1000 * 60))} min</div>
+                </div>
+                {selectedTask.qty && (
+                  <div>
+                    <label className="text-sm font-medium opacity-70">Ilość</label>
+                    <div>{selectedTask.qty}</div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Details Panel */}
+      {selectedTask && (
+        <div className={`border-t transition-colors ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-4 text-sm">
+              <span className="font-medium">Wybrane zadanie:</span>
+              <span className="font-mono">{selectedTask.orderNo}</span>
+              {selectedTask.opNo && <span className="opacity-70">Op: {selectedTask.opNo}</span>}
+              <span>na {selectedTask.resource}</span>
+              <span className="opacity-70">
+                {format(selectedTask.startTime, 'dd.MM HH:mm', { locale: pl })} - {format(selectedTask.endTime, 'HH:mm', { locale: pl })}
+              </span>
+              {selectedTask.qty && <span>Qty: {selectedTask.qty}</span>}
+            </div>
+          </div>
+        </div>
+      )}
                         key={index}
                         d={`M ${fromX} ${fromY} L ${midX} ${fromY} L ${midX} ${toY} L ${toX} ${toY}`}
                         stroke={darkMode ? '#60a5fa' : '#3b82f6'}

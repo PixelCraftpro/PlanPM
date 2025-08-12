@@ -28,7 +28,7 @@ export const TaskBar: React.FC<TaskBarProps> = ({
   const textColor = getContrastText(bgColor)
   
   // Determine label based on width
-  const labelFull = `${task.orderNo} • ${task.resource}${task.qty ? ' • ' + task.qty : ''}`
+  const labelFull = `${task.orderNo}${task.opNo ? ' Op:' + task.opNo : ''} • ${task.resource}${task.qty ? ' • ' + task.qty : ''}`
   const labelShort = task.orderNo
   const useShort = width < 80
   

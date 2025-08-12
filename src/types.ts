@@ -6,6 +6,9 @@ export interface Task {
   endTime: Date
   qty?: number
   lane?: number
+  opNo?: string
+  product?: string
+  partNo?: string
 }
 
 export interface RouteConnection {

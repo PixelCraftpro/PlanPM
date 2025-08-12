@@ -317,6 +317,12 @@ function GanttPlanner() {
 
   // Apply filters and calculate time range
   useEffect(() => {
+    console.log('🔄 Filtrowanie zadań:', {
+      totalTasks: tasks.length,
+      selectedResources: selectedResources.length,
+      searchQuery
+    })
+    
     let filtered = tasks
 
     // Filter by selected resources
@@ -377,6 +383,10 @@ function GanttPlanner() {
 
     // Assign lanes
     filtered = assignLanes(filtered)
+    console.log('📈 Zadania po filtracji i lane assignment:', {
+      filteredLength: filtered.length,
+      sampleTasks: filtered.slice(0, 3)
+    })
     setFilteredTasks(filtered)
 
     // Calculate time range if not set by route

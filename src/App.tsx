@@ -420,6 +420,15 @@ function GanttPlanner() {
           // First try to sort by operation number
           if (a.opNo && b.opNo) {
             const opA = parseInt(a.opNo)
+            const opB = parseInt(b.opNo)
+            if (!isNaN(opA) && !isNaN(opB)) {
+              return opA - opB
+            }
+          }
+          // Fallback to start time
+          return a.startTime.getTime() - b.startTime.getTime()
+        })
+        
         const connections: RouteConnection[] = []
         for (let i = 0; i < sortedRoute.length - 1; i++) {
           connections.push({ from: sortedRoute[i], to: sortedRoute[i + 1] })
@@ -435,17 +444,6 @@ function GanttPlanner() {
             start: new Date(minTime - margin),
             end: new Date(maxTime + margin)
           })
-        if (validCount < 5) {
-          console.log(`✅ Poprawny rekord ${validCount + 1}:`, {
-            orderNo,
-            resource,
-            startTime: startTime.toISOString(),
-            endTime: endTime.toISOString(),
-            qty,
-            opNo
-          })
-        }
-
         }
       } else {
         // Partial match - filter list

@@ -31,7 +31,7 @@ import { hashColor } from './utils/colorUtils'
 const parseDate = (dateStr: string): Date | null => {
   if (!dateStr) return null
   
-  // console.log('🔍 Parsowanie daty:', dateStr) // Wyłączam verbose logging
+  console.log('🔍 Parsowanie daty:', dateStr)
   
   // Try parsing as timestamp first
   const timestamp = parseInt(dateStr)
@@ -43,7 +43,7 @@ const parseDate = (dateStr: string): Date | null => {
   try {
     const isoDate = parseISO(dateStr)
     if (isValid(isoDate)) {
-      // console.log('✅ Sparsowano jako ISO:', isoDate)
+      console.log('✅ Sparsowano jako ISO:', isoDate)
       return isoDate
     }
   } catch {}
@@ -54,35 +54,27 @@ const parseDate = (dateStr: string): Date | null => {
     'dd.MM.yyyy HH:mm:ss',
     'dd.MM.yyyy H:mm',
     'dd.MM.yyyy H:mm:ss',
-    'dd.MM.yyyy HH:mm:ss',
-    'dd.MM.yyyy H:mm:ss',
-    'dd/MM/yyyy HH:mm:ss',
-    'dd/MM/yyyy H:mm:ss',
     'yyyy-MM-dd HH:mm',
     'yyyy-MM-dd H:mm',
-    'yyyy-MM-dd HH:mm:ss',
-    'yyyy-MM-dd H:mm:ss',
     'dd/MM/yyyy HH:mm',
     'dd/MM/yyyy H:mm',
     'MM/dd/yyyy HH:mm',
     'MM/dd/yyyy H:mm',
     'dd.MM.yyyy',
-    'yyyy-MM-dd',
-    'dd-MM-yyyy HH:mm',
-    'dd-MM-yyyy H:mm'
+    'yyyy-MM-dd'
   ]
   
   for (const formatStr of formats) {
     try {
       const parsed = parse(dateStr, formatStr, new Date())
       if (isValid(parsed)) {
-        // console.log(`✅ Sparsowano jako ${formatStr}:`, parsed)
+        console.log(`✅ Sparsowano jako ${formatStr}:`, parsed)
         return parsed
       }
     } catch {}
   }
   
-  console.warn('❌ Nie udało się sparsować daty:', dateStr)
+  console.log('❌ Nie udało się sparsować daty:', dateStr)
   return null
 }
 
@@ -206,8 +198,6 @@ const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => 
   console.log(`✅ Sparsowano ${parsedTasks.length} zadań z ${data.length} rekordów`)
   console.log('📊 Przykładowe zadania:', parsedTasks.slice(0, 3))
   return parsedTasks
-}
-
 }
 
 // Legacy function for backward compatibility
@@ -404,8 +394,7 @@ function GanttPlanner() {
     console.log('🔄 Filtrowanie zadań:', {
       totalTasks: tasks.length,
       selectedResources: selectedResources.length,
-      searchQuery,
-      sampleTasks: tasks.slice(0, 2)
+      searchQuery
     })
     
     let filtered = tasks

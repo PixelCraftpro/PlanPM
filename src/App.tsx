@@ -28,8 +28,38 @@ import { Task, RouteConnection } from './types'
 import { hashColor } from './utils/colorUtils'
 
 // Utility functions
-const parseDate = (dateStr: string): Date | null => {
-  if (!dateStr) return null
+// Funkcja do normalizacji nazw kolumn z obsługą polskich znaków
+const normalizeColumnName = (raw: string): string => {
+  // 1) zdejmij ogonki
+  const ascii = raw.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+  const compact = ascii.replace(/[^a-z0-9]/g, '')
+
+  if (/^(orderno|order|id|nr|no|zlecenie)/.test(compact)) return 'orderno'
+  if (/^(resource|maszyna|machine|zasob|zasoby)/.test(compact)) return 'resource'
+  if (/^(start|begin|poczatek|rozpoczecie|dataod|czasrozpoczecia)/.test(compact)) return 'starttime'
+  if (/^(end|finish|koniec|zakonczenie|datado|czaszakonczenia)/.test(compact)) return 'endtime'
+  if (/^(qty|quantity|ilosc)/.test(compact)) return 'qty'
+  if (/^(op|operation|operacja|opno)/.test(compact)) return 'opno'
+  if (/^(product|produkt)/.test(compact)) return 'product'
+  if (/^(part|partno|partnumber|nrczesci)/.test(compact)) return 'partno'
+  return compact
+}
+
+const parseDate = (dateStr: any): Date | null => {
+  if (dateStr == null || dateStr === '') return null
+
+  // Excel serial (dni od 1899-12-30)
+  const asNum = Number(dateStr)
+  if (!Number.isNaN(asNum) && asNum > 60 && asNum < 100000) {
+    const base = Date.UTC(1899, 11, 30)
+    return new Date(base + asNum * 86400000)
+  }
+
+  // Try as timestamp first
+  const asTimestamp = Number(dateStr)
+  if (!Number.isNaN(asTimestamp) && asTimestamp > 1000000000) {
+    return new Date(asTimestamp * (asTimestamp < 10000000000 ? 1000 : 1))
+  }
   
   console.log('🔍 Parsowanie daty:', dateStr)
   
@@ -76,19 +106,6 @@ const parseDate = (dateStr: string): Date | null => {
   
   console.log('❌ Nie udało się sparsować daty:', dateStr)
   return null
-}
-
-const normalizeColumnName = (name: string): string => {
-  return name.toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-    .replace(/^(order|id|nr|no|orderno).*/, 'orderno')
-    .replace(/^(resource|maszyna|machine).*/, 'resource')
-    .replace(/^(start|begin|początek).*/, 'starttime')
-    .replace(/^(end|finish|koniec).*/, 'endtime')
-    .replace(/^(qty|quantity|ilość|ilosc).*/, 'qty')
-    .replace(/^(op|operation|operacja).*/, 'opno')
-    .replace(/^(product|produkt).*/, 'product')
-    .replace(/^(part|partno|partnumber).*/, 'partno')
 }
 
 const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => {

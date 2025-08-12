@@ -284,7 +284,7 @@ const assignLanes = (tasks: Task[]): Task[] => {
       
       for (let i = 0; i < lanes.length; i++) {
         if (lanes[i].endTime <= startTime) {
-        if (!String(task.resource || '').toLowerCase().includes(resourceFilter.toLowerCase())) {
+          assignedLane = i
           break
         }
       }

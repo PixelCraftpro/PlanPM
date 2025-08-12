@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { Upload, X, FileText, FileSpreadsheet } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ColumnMapper, ColumnMapping } from './ColumnMapper'
 
 interface ImportProgress {
   isImporting: boolean
@@ -12,10 +13,11 @@ interface ImportProgress {
 
 interface FileImporterProps {
   onDataImported: (data: any[]) => void
+  onDataImportedWithMapping: (data: any[], mapping: ColumnMapping) => void
   darkMode: boolean
 }
 
-export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, darkMode }) => {
+export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, onDataImportedWithMapping, darkMode }) => {
   const [importProgress, setImportProgress] = useState<ImportProgress>({
     isImporting: false,
     progress: 0,
@@ -23,6 +25,9 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
     fileName: '',
     status: 'processing'
   })
+  const [showColumnMapper, setShowColumnMapper] = useState(false)
+  const [importedData, setImportedData] = useState<any[]>([])
+  const [detectedColumns, setDetectedColumns] = useState<string[]>([])
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const workerRef = useRef<Worker | null>(null)
@@ -106,7 +111,23 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
           status: 'finalizing'
         }))
         
-        // Small delay to show finalizing status
+        // Check if we have columns to map
+        if (rows.length > 0) {
+          const columns = Object.keys(rows[0])
+          setDetectedColumns(columns)
+          setImportedData(rows)
+          
+          // Show column mapper
+          setTimeout(() => {
+            resetImportProgress()
+            setShowColumnMapper(true)
+          }, 500)
+        } else {
+          resetImportProgress()
+        }
+      }
+
+      const completeImportDirect = (rows: any[]) => {
         setTimeout(() => {
           onDataImported(rows)
           resetImportProgress()
@@ -203,6 +224,19 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
       fileName: '',
       status: 'processing'
     })
+  }
+
+  const handleColumnMappingConfirm = (mapping: ColumnMapping) => {
+    setShowColumnMapper(false)
+    onDataImportedWithMapping(importedData, mapping)
+    setImportedData([])
+    setDetectedColumns([])
+  }
+
+  const handleColumnMappingCancel = () => {
+    setShowColumnMapper(false)
+    setImportedData([])
+    setDetectedColumns([])
   }
 
   // Cleanup on unmount
@@ -311,6 +345,16 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Column Mapper */}
+      <ColumnMapper
+        isOpen={showColumnMapper}
+        onClose={handleColumnMappingCancel}
+        onConfirm={handleColumnMappingConfirm}
+        columns={detectedColumns}
+        sampleData={importedData.slice(0, 5)}
+        darkMode={darkMode}
+      />
     </>
   )
 }

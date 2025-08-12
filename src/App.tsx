@@ -22,6 +22,7 @@ import jsPDF from 'jspdf'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { LandingPage } from './components/LandingPage'
 import { FileImporter } from './components/FileImporter'
+import { ColumnMapping } from './components/ColumnMapper'
 import { TaskBar } from './components/TaskBar'
 import { Task, RouteConnection } from './types'
 import { hashColor } from './utils/colorUtils'
@@ -77,7 +78,72 @@ const normalizeColumnName = (name: string): string => {
     .replace(/^(part|partno|partnumber).*/, 'partno')
 }
 
-const normalizeImportedData = (data: any[]): Task[] => {
+const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => {
+  if (!data.length) return []
+  
+  let columnMap: Record<string, string> = {}
+
+  if (mapping) {
+    // Use provided mapping
+    columnMap = {
+      orderno: mapping.orderNo,
+      resource: mapping.resource,
+      starttime: mapping.startTime,
+      endtime: mapping.endTime,
+      qty: mapping.qty || '',
+      opno: mapping.opNo || '',
+      product: mapping.product || '',
+      partno: mapping.partNo || ''
+    }
+  } else {
+    // Auto-detect columns (legacy behavior)
+    const firstRow = data[0]
+    
+    Object.keys(firstRow).forEach(key => {
+      const normalized = normalizeColumnName(key)
+      if (['orderno', 'resource', 'starttime', 'endtime', 'qty', 'opno', 'product', 'partno'].includes(normalized)) {
+        columnMap[normalized] = key
+      }
+    })
+  }
+
+  const parsedTasks: Task[] = []
+  
+  data.forEach((row, index) => {
+    const orderNo = row[columnMap.orderno] || ''
+    const resource = row[columnMap.resource] || ''
+    const startTimeStr = row[columnMap.starttime] || ''
+    const endTimeStr = row[columnMap.endtime] || ''
+    const qtyStr = row[columnMap.qty] || ''
+    const opNo = row[columnMap.opno] || ''
+    const product = row[columnMap.product] || ''
+    const partNo = row[columnMap.partno] || ''
+
+    if (!orderNo || !resource || !startTimeStr || !endTimeStr) return
+
+    const startTime = parseDate(startTimeStr.toString())
+    const endTime = parseDate(endTimeStr.toString())
+
+    if (!startTime || !endTime) return
+
+    parsedTasks.push({
+      id: `${orderNo}-${opNo || index}`,
+      orderNo: orderNo.toString(),
+      resource: resource.toString(),
+      startTime,
+      endTime,
+      qty: qtyStr ? parseInt(qtyStr.toString()) : undefined,
+      opNo: opNo ? opNo.toString() : undefined,
+      product: product ? product.toString() : undefined,
+      partNo: partNo ? partNo.toString() : undefined
+    })
+  })
+  
+  return parsedTasks
+}
+
+// Legacy function for backward compatibility
+const normalizeImportedDataLegacy = (data: any[]): Task[] => {
   if (!data.length) return []
   
   // Get column mapping
@@ -325,7 +391,13 @@ function GanttPlanner() {
   }, [tasks, selectedResources, searchQuery, timeRange])
 
   const handleDataImported = useCallback((data: any[]) => {
-    const parsedTasks = normalizeImportedData(data)
+    const parsedTasks = normalizeImportedDataLegacy(data)
+    setTasks(parsedTasks)
+    setTimeRange(null) // Reset time range to auto-calculate
+  }, [])
+
+  const handleDataImportedWithMapping = useCallback((data: any[], mapping: ColumnMapping) => {
+    const parsedTasks = normalizeImportedData(data, mapping)
     setTasks(parsedTasks)
     setTimeRange(null) // Reset time range to auto-calculate
   }, [])
@@ -512,7 +584,11 @@ function GanttPlanner() {
         <div className="px-4 py-3">
           <div className="flex flex-wrap items-center gap-3">
             {/* File Import */}
-            <FileImporter onDataImported={handleDataImported} darkMode={darkMode} />
+            <FileImporter 
+              onDataImported={handleDataImported} 
+              onDataImportedWithMapping={handleDataImportedWithMapping}
+              darkMode={darkMode} 
+            />
 
             {/* Demo Button */}
             <button

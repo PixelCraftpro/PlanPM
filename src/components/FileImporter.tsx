@@ -7,6 +7,7 @@ interface ImportProgress {
   progress: number
   processedRows: number
   fileName: string
+  status: 'processing' | 'finalizing' | 'complete' | 'error'
 }
 
 interface FileImporterProps {
@@ -19,11 +20,14 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
     isImporting: false,
     progress: 0,
     processedRows: 0,
-    fileName: ''
+    fileName: '',
+    status: 'processing'
   })
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const workerRef = useRef<Worker | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastProgressRef = useRef<number>(0)
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -41,8 +45,14 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
       isImporting: true,
       progress: 0,
       processedRows: 0,
-      fileName: file.name
+      fileName: file.name,
+      status: 'processing'
     })
+
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
 
     try {
       // Terminate existing worker
@@ -55,6 +65,71 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
       workerRef.current = new Worker(workerPath, { type: 'module' })
       
       const allRows: any[] = []
+      let isCompleted = false
+
+      // Set up progress monitoring timeout
+      const monitorProgress = () => {
+        timeoutRef.current = setTimeout(() => {
+          if (!isCompleted && importProgress.progress === lastProgressRef.current) {
+            // No progress for 10 seconds - assume stuck
+            console.warn('Import appears to be stuck, forcing completion')
+            if (allRows.length > 0) {
+              completeImport(allRows)
+            } else {
+              handleImportError('Import zawiesił się - spróbuj ponownie z mniejszym plikiem')
+            }
+          } else {
+            lastProgressRef.current = importProgress.progress
+            if (!isCompleted) {
+              monitorProgress()
+            }
+          }
+        }, 10000) // 10 second timeout
+      }
+
+      const completeImport = (rows: any[]) => {
+        if (isCompleted) return
+        isCompleted = true
+        
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+        }
+        
+        setImportProgress(prev => ({
+          ...prev,
+          progress: 100,
+          status: 'finalizing'
+        }))
+        
+        // Small delay to show finalizing status
+        setTimeout(() => {
+          onDataImported(rows)
+          resetImportProgress()
+        }, 500)
+      }
+
+      const handleImportError = (errorMessage: string) => {
+        if (isCompleted) return
+        isCompleted = true
+        
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current)
+        }
+        
+        console.error('Import error:', errorMessage)
+        alert(`Błąd importu: ${errorMessage}`)
+        resetImportProgress()
+      }
+
+      const resetImportProgress = () => {
+        setImportProgress({
+          isImporting: false,
+          progress: 0,
+          processedRows: 0,
+          fileName: '',
+          status: 'processing'
+        })
+      }
 
       workerRef.current.onmessage = (e) => {
         const { type, rows, progress, totalRows, error } = e.data
@@ -64,34 +139,22 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
           setImportProgress(prev => ({
             ...prev,
             progress: progress || 0,
-            processedRows: allRows.length
+            processedRows: allRows.length,
+            status: 'processing'
           }))
         } else if (type === 'done') {
-          setImportProgress(prev => ({
-            ...prev,
-            progress: 100
-          }))
-          
-          setTimeout(() => {
-            onDataImported(allRows)
-            setImportProgress({
-              isImporting: false,
-              progress: 0,
-              processedRows: 0,
-              fileName: ''
-            })
-          }, 500)
+          completeImport(allRows)
         } else if (type === 'error') {
-          console.error('Import error:', error)
-          alert(`Błąd importu: ${error}`)
-          setImportProgress({
-            isImporting: false,
-            progress: 0,
-            processedRows: 0,
-            fileName: ''
-          })
+          handleImportError(error)
         }
       }
+
+      workerRef.current.onerror = (error) => {
+        handleImportError(`Worker error: ${error.message}`)
+      }
+
+      // Start progress monitoring
+      monitorProgress()
 
       // Send file to worker
       if (isXLSX) {
@@ -104,12 +167,7 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
     } catch (error) {
       console.error('Worker creation failed:', error)
       alert('Błąd podczas tworzenia workera')
-      setImportProgress({
-        isImporting: false,
-        progress: 0,
-        processedRows: 0,
-        fileName: ''
-      })
+      resetImportProgress()
     }
 
     // Reset input
@@ -117,17 +175,35 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
   }
 
   const cancelImport = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    
     if (workerRef.current) {
       workerRef.current.terminate()
       workerRef.current = null
     }
+    
     setImportProgress({
       isImporting: false,
       progress: 0,
       processedRows: 0,
-      fileName: ''
+      fileName: '',
+      status: 'processing'
     })
   }
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      if (workerRef.current) {
+        workerRef.current.terminate()
+      }
+    }
+  }, [])
 
   return (
     <>
@@ -212,7 +288,11 @@ export const FileImporter: React.FC<FileImporterProps> = ({ onDataImported, dark
                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                     className="inline-block w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"
                   />
-                  <p className="text-sm mt-2 opacity-70">Skanuję plik...</p>
+                  <p className="text-sm mt-2 opacity-70">
+                    {importProgress.status === 'processing' && 'Skanuję plik...'}
+                    {importProgress.status === 'finalizing' && 'Finalizuję import...'}
+                    {importProgress.status === 'complete' && 'Gotowe!'}
+                  </p>
                 </div>
               </div>
             </motion.div>

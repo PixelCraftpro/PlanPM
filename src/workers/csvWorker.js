@@ -3,6 +3,8 @@ import Papa from 'papaparse'
 self.onmessage = async (e) => {
   const { file } = e.data
   
+  let hasCompleted = false
+  
   Papa.parse(file, {
     header: true,
     worker: false, // We're already in a worker
@@ -11,6 +13,8 @@ self.onmessage = async (e) => {
     fastMode: true,
     chunkSize: 1024 * 64,
     chunk: (results, parser) => {
+      if (hasCompleted) return
+      
       self.postMessage({ 
         type: 'chunk', 
         rows: results.data,
@@ -18,12 +22,21 @@ self.onmessage = async (e) => {
       })
     },
     complete: (results) => {
-      self.postMessage({ 
-        type: 'done',
-        totalRows: results.data.length
-      })
+      if (hasCompleted) return
+      hasCompleted = true
+      
+      // Small delay before completion
+      setTimeout(() => {
+        self.postMessage({ 
+          type: 'done',
+          totalRows: results.data.length
+        })
+      }, 100)
     },
     error: (error) => {
+      if (hasCompleted) return
+      hasCompleted = true
+      
       self.postMessage({ 
         type: 'error', 
         error: error.message 

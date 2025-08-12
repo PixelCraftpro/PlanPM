@@ -980,10 +980,21 @@ function GanttPlanner() {
             className="overflow-auto flex-1"
             onWheel={handleWheel}
           >
+            {filteredTasks.length === 0 ? (
+              <div className="flex items-center justify-center h-64">
+                <div className={`text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <Calendar size={48} className="mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium mb-2">Brak danych do wyświetlenia</p>
+                  <p className="text-sm">Wgraj plik CSV/XLSX lub użyj danych demo</p>
+                </div>
+              </div>
+            ) : (
             <div style={{ width: `${chartWidth}px` }} className="relative">
               {virtualizer.getVirtualItems().map(virtualRow => {
                 const resource = resourceKeys[virtualRow.index]
                 const resourceTasks = resourceGroups[resource]
+                
+                if (!resourceTasks || resourceTasks.length === 0) return null
                 
                 return (
                   <div
@@ -1019,6 +1030,7 @@ function GanttPlanner() {
                     {resourceTasks.map(task => {
                       if (!timeRange) return null
                       
+                      try {
                       const startX = ((task.startTime.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60)) * zoomLevel
                       const width = ((task.endTime.getTime() - task.startTime.getTime()) / (1000 * 60 * 60)) * zoomLevel
                       const laneHeight = Math.floor(rowHeight / maxLanesPerResource)
@@ -1044,6 +1056,10 @@ function GanttPlanner() {
                           onClick={() => setSelectedTask(task)}
                         />
                       )
+                      } catch (error) {
+                        console.error('Error rendering task:', task.id, error)
+                        return null
+                      }
                     })}
                   </div>
                 )
@@ -1053,6 +1069,7 @@ function GanttPlanner() {
               {routeConnections.length > 0 && timeRange && (
                 <svg className="absolute inset-0 pointer-events-none" style={{ width: `${chartWidth}px`, height: `${virtualizer.getTotalSize()}px` }}>
                   {routeConnections.map((connection, index) => {
+                    try {
                     const fromResource = connection.from.resource
                     const toResource = connection.to.resource
                     const fromResourceIndex = resourceKeys.indexOf(fromResource)
@@ -1101,6 +1118,10 @@ function GanttPlanner() {
                         />
                       </g>
                     )
+                    } catch (error) {
+                      console.error('Error rendering connection:', index, error)
+                      return null
+                    }
                   })}
                   
                   {/* Arrow marker definition */}
@@ -1123,6 +1144,7 @@ function GanttPlanner() {
                 </svg>
               )}
             </div>
+            )}
           </div>
         </div>
       </div>

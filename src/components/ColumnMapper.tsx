@@ -54,6 +54,14 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({
   // Auto-detect columns on open
   useEffect(() => {
     if (isOpen && columns.length > 0) {
+      // Funkcja do normalizacji nazw kolumn z obsługą polskich znaków
+      const normalizeColumnName = (raw: string): string => {
+        // 1) zdejmij ogonki
+        const ascii = raw.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+        const compact = ascii.replace(/[^a-z0-9]/g, '')
+        return compact
+      }
+
       const autoMapping: ColumnMapping = {
         orderNo: '',
         resource: '',
@@ -62,75 +70,57 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({
       }
 
       columns.forEach(col => {
-        const normalized = col.toLowerCase().replace(/[^a-z0-9]/g, '')
+        const normalized = normalizeColumnName(col)
         
         // Order No detection
         if (!autoMapping.orderNo && (
-          normalized.includes('order') || 
-          normalized.includes('orderno') ||
-          normalized.includes('zlecenie')
+          /^(orderno|order|id|nr|no|zlecenie)/.test(normalized)
         )) {
           autoMapping.orderNo = col
         }
         
-        // Resource detection - prefer "Resource Group Name" over "Resource"
-        if (normalized.includes('resource') && !normalized.includes('group')) {
-          // Prefer "Resource" over "Resource Group Name"
+        // Resource detection - prefer "Resource" over "Resource Group Name"
+        if (/^(resource|maszyna|machine|zasob|zasoby)$/.test(normalized) && !normalized.includes('group')) {
           autoMapping.resource = col
-        } else if (!autoMapping.resource && (
-          normalized.includes('resource') || 
-          normalized.includes('maszyna') ||
-          normalized.includes('machine')
-        )) {
+        } else if (!autoMapping.resource && /^(resource|maszyna|machine|zasob|zasoby)/.test(normalized)) {
           autoMapping.resource = col
         }
         
         // Start Time detection
         if (!autoMapping.startTime && (
-          normalized.includes('start') || 
-          normalized.includes('begin') ||
-          normalized.includes('poczatek')
+          /^(start|begin|poczatek|rozpoczecie|dataod|czasrozpoczecia)/.test(normalized)
         )) {
           autoMapping.startTime = col
         }
         
         // End Time detection
         if (!autoMapping.endTime && (
-          normalized.includes('end') || 
-          normalized.includes('finish') ||
-          normalized.includes('koniec')
+          /^(end|finish|koniec|zakonczenie|datado|czaszakonczenia)/.test(normalized)
         )) {
           autoMapping.endTime = col
         }
         
         // Optional fields
         if (!autoMapping.qty && (
-          normalized.includes('qty') || 
-          normalized.includes('quantity') ||
-          normalized.includes('ilosc')
+          /^(qty|quantity|ilosc)/.test(normalized)
         )) {
           autoMapping.qty = col
         }
         
         if (!autoMapping.opNo && (
-          normalized.includes('opno') || 
-          normalized.includes('operation') ||
-          normalized.includes('operacja')
+          /^(op|operation|operacja|opno)/.test(normalized)
         )) {
           autoMapping.opNo = col
         }
         
         if (!autoMapping.product && (
-          normalized.includes('product') || 
-          normalized.includes('produkt')
+          /^(product|produkt)/.test(normalized)
         )) {
           autoMapping.product = col
         }
         
         if (!autoMapping.partNo && (
-          normalized.includes('partno') || 
-          normalized.includes('partnumber') ||
-          normalized.includes('part')
+          /^(part|partno|partnumber|nrczesci)/.test(normalized)
         )) {
           autoMapping.partNo = col
         }

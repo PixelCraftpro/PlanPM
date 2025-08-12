@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -389,24 +389,6 @@ function GanttPlanner() {
     localStorage.setItem('customTimeRange', JSON.stringify(customTimeRange))
   }, [customTimeRange])
 
-  // Viewport culling - używaj ganttRef zamiast scrollRef
-  const visibleTasks = useMemo(() => {
-    const scroller = ganttRef.current ?? scrollRef.current
-    if (!scroller) return filteredTasks
-    
-    const viewportLeft = scroller.scrollLeft
-    const viewportRight = viewportLeft + scroller.clientWidth
-
-    return filteredTasks.filter(task => {
-      if (!timeRange) return true
-      
-      const startX = ((task.startTime.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60)) * zoomLevel
-      const width = ((task.endTime.getTime() - task.startTime.getTime()) / (1000 * 60 * 60)) * zoomLevel
-      
-      return !(startX + width < viewportLeft || startX > viewportRight)
-    })
-  }, [filteredTasks, timeRange, zoomLevel, ganttRef.current?.scrollLeft])
-
   // Apply filters and calculate time range
   useEffect(() => {
     console.log('🔄 Filtrowanie zadań:', {
@@ -438,15 +420,6 @@ function GanttPlanner() {
           // First try to sort by operation number
           if (a.opNo && b.opNo) {
             const opA = parseInt(a.opNo)
-            const opB = parseInt(b.opNo)
-            if (!isNaN(opA) && !isNaN(opB)) {
-              return opA - opB
-            }
-          }
-          // Fallback to start time
-          return a.startTime.getTime() - b.startTime.getTime()
-        })
-        
         const connections: RouteConnection[] = []
         for (let i = 0; i < sortedRoute.length - 1; i++) {
           connections.push({ from: sortedRoute[i], to: sortedRoute[i + 1] })
@@ -462,6 +435,17 @@ function GanttPlanner() {
             start: new Date(minTime - margin),
             end: new Date(maxTime + margin)
           })
+        if (validCount < 5) {
+          console.log(`✅ Poprawny rekord ${validCount + 1}:`, {
+            orderNo,
+            resource,
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            qty,
+            opNo
+          })
+        }
+
         }
       } else {
         // Partial match - filter list

@@ -31,7 +31,7 @@ import { hashColor } from './utils/colorUtils'
 const parseDate = (dateStr: string): Date | null => {
   if (!dateStr) return null
   
-  console.log('🔍 Parsowanie daty:', dateStr)
+  // console.log('🔍 Parsowanie daty:', dateStr) // Wyłączam verbose logging
   
   // Try parsing as timestamp first
   const timestamp = parseInt(dateStr)
@@ -43,7 +43,7 @@ const parseDate = (dateStr: string): Date | null => {
   try {
     const isoDate = parseISO(dateStr)
     if (isValid(isoDate)) {
-      console.log('✅ Sparsowano jako ISO:', isoDate)
+      // console.log('✅ Sparsowano jako ISO:', isoDate)
       return isoDate
     }
   } catch {}
@@ -54,27 +54,35 @@ const parseDate = (dateStr: string): Date | null => {
     'dd.MM.yyyy HH:mm:ss',
     'dd.MM.yyyy H:mm',
     'dd.MM.yyyy H:mm:ss',
+    'dd.MM.yyyy HH:mm:ss',
+    'dd.MM.yyyy H:mm:ss',
+    'dd/MM/yyyy HH:mm:ss',
+    'dd/MM/yyyy H:mm:ss',
     'yyyy-MM-dd HH:mm',
     'yyyy-MM-dd H:mm',
+    'yyyy-MM-dd HH:mm:ss',
+    'yyyy-MM-dd H:mm:ss',
     'dd/MM/yyyy HH:mm',
     'dd/MM/yyyy H:mm',
     'MM/dd/yyyy HH:mm',
     'MM/dd/yyyy H:mm',
     'dd.MM.yyyy',
-    'yyyy-MM-dd'
+    'yyyy-MM-dd',
+    'dd-MM-yyyy HH:mm',
+    'dd-MM-yyyy H:mm'
   ]
   
   for (const formatStr of formats) {
     try {
       const parsed = parse(dateStr, formatStr, new Date())
       if (isValid(parsed)) {
-        console.log(`✅ Sparsowano jako ${formatStr}:`, parsed)
+        // console.log(`✅ Sparsowano jako ${formatStr}:`, parsed)
         return parsed
       }
     } catch {}
   }
   
-  console.log('❌ Nie udało się sparsować daty:', dateStr)
+  console.warn('❌ Nie udało się sparsować daty:', dateStr)
   return null
 }
 
@@ -94,6 +102,12 @@ const normalizeColumnName = (name: string): string => {
 const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => {
   if (!data.length) return []
   
+  console.log('🔄 normalizeImportedData - rozpoczynam parsowanie:', {
+    dataLength: data.length,
+    mapping,
+    sampleRow: data[0]
+  })
+  
   let columnMap: Record<string, string> = {}
 
   if (mapping) {
@@ -108,6 +122,7 @@ const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => 
       product: mapping.product || '',
       partno: mapping.partNo || ''
     }
+    console.log('📋 Używam mapowania:', columnMap)
   } else {
     // Auto-detect columns (legacy behavior)
     const firstRow = data[0]
@@ -118,29 +133,49 @@ const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => 
         columnMap[normalized] = key
       }
     })
+    console.log('🔍 Auto-wykryte mapowanie:', columnMap)
   }
 
   const parsedTasks: Task[] = []
   
   data.forEach((row, index) => {
-    const orderNo = row[columnMap.orderno] || ''
-    const resource = row[columnMap.resource] || ''
-    const startTimeStr = row[columnMap.starttime] || ''
-    const endTimeStr = row[columnMap.endtime] || ''
-    const qtyStr = row[columnMap.qty] || ''
-    const opNo = row[columnMap.opno] || ''
-    const product = row[columnMap.product] || ''
-    const partNo = row[columnMap.partno] || ''
+    const orderNo = row[columnMap.orderno] || row['Order No.'] || ''
+    const resource = row[columnMap.resource] || row['Resource'] || ''
+    const startTimeStr = row[columnMap.starttime] || row['Start Time'] || ''
+    const endTimeStr = row[columnMap.endtime] || row['End Time'] || ''
+    const qtyStr = row[columnMap.qty] || row['Qty.'] || ''
+    const opNo = row[columnMap.opno] || row['Op. No.'] || ''
+    const product = row[columnMap.product] || row['Product'] || ''
+    const partNo = row[columnMap.partno] || row['Part No.'] || ''
 
-    console.log(`📝 Przetwarzanie rekordu ${index + 1}:`, {
-      orderNo,
-      resource,
-      startTimeStr,
-      endTimeStr,
-      opNo
-    })
+    if (index < 5) { // Log tylko pierwsze 5 rekordów
+      console.log(`📝 Przetwarzanie rekordu ${index + 1}:`, {
+        orderNo,
+        resource,
+        startTimeStr,
+        endTimeStr,
+        opNo,
+        rawRow: row
+      })
+    }
 
-    if (!orderNo || !resource || !startTimeStr || !endTimeStr) return
+    if (!orderNo || !resource) {
+      console.log(`❌ Brak wymaganych danych dla rekordu ${index + 1}:`, {
+        orderNo,
+        resource,
+        availableKeys: Object.keys(row)
+      })
+      return
+    }
+
+    if (!startTimeStr || !endTimeStr) {
+      console.log(`❌ Brak dat dla rekordu ${index + 1}:`, {
+        startTimeStr,
+        endTimeStr,
+        availableKeys: Object.keys(row)
+      })
+      return
+    }
 
     const startTime = parseDate(startTimeStr.toString())
     const endTime = parseDate(endTimeStr.toString())
@@ -157,8 +192,8 @@ const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => 
 
     parsedTasks.push({
       id: `${orderNo}-${opNo || index}`,
-      orderNo: orderNo.toString(),
-      resource: resource.toString(),
+      orderNo,
+      resource,
       startTime,
       endTime,
       qty: qtyStr ? parseInt(qtyStr.toString()) : undefined,
@@ -169,7 +204,10 @@ const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => 
   })
   
   console.log(`✅ Sparsowano ${parsedTasks.length} zadań z ${data.length} rekordów`)
+  console.log('📊 Przykładowe zadania:', parsedTasks.slice(0, 3))
   return parsedTasks
+}
+
 }
 
 // Legacy function for backward compatibility
@@ -366,7 +404,8 @@ function GanttPlanner() {
     console.log('🔄 Filtrowanie zadań:', {
       totalTasks: tasks.length,
       selectedResources: selectedResources.length,
-      searchQuery
+      searchQuery,
+      sampleTasks: tasks.slice(0, 2)
     })
     
     let filtered = tasks
@@ -453,9 +492,22 @@ function GanttPlanner() {
   }, [])
 
   const handleDataImportedWithMapping = useCallback((data: any[], mapping: ColumnMapping) => {
+    console.log('🎯 handleDataImportedWithMapping wywołane:', {
+      dataLength: data.length,
+      mapping,
+      sampleData: data.slice(0, 2)
+    })
+    
     const parsedTasks = normalizeImportedData(data, mapping)
+    console.log('📈 Wynik parsowania:', {
+      parsedTasksLength: parsedTasks.length,
+      sampleTasks: parsedTasks.slice(0, 2)
+    })
+    
     setTasks(parsedTasks)
     setTimeRange(null) // Reset time range to auto-calculate
+    
+    console.log('✅ Zadania ustawione w state')
   }, [])
 
   const handleDemoData = useCallback(() => {

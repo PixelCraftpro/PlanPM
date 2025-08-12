@@ -74,15 +74,13 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({
         }
         
         // Resource detection - prefer "Resource Group Name" over "Resource"
-        if (!autoMapping.resource && (
+        if (normalized.includes('resource') && !normalized.includes('group')) {
+          // Prefer "Resource" over "Resource Group Name"
+          autoMapping.resource = col
+        } else if (!autoMapping.resource && (
           normalized.includes('resource') || 
           normalized.includes('maszyna') ||
           normalized.includes('machine')
-        )) {
-          autoMapping.resource = col
-        } else if (!autoMapping.resource && (
-          normalized.includes('resourcegroup') || 
-          normalized.includes('resourcegroupname')
         )) {
           autoMapping.resource = col
         }

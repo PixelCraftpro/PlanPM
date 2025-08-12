@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -388,6 +388,24 @@ function GanttPlanner() {
   useEffect(() => {
     localStorage.setItem('customTimeRange', JSON.stringify(customTimeRange))
   }, [customTimeRange])
+
+  // Viewport culling - używaj ganttRef zamiast scrollRef
+  const visibleTasks = useMemo(() => {
+    const scroller = ganttRef.current ?? scrollRef.current
+    if (!scroller) return filteredTasks
+    
+    const viewportLeft = scroller.scrollLeft
+    const viewportRight = viewportLeft + scroller.clientWidth
+
+    return filteredTasks.filter(task => {
+      if (!timeRange) return true
+      
+      const startX = ((task.startTime.getTime() - timeRange.start.getTime()) / (1000 * 60 * 60)) * zoomLevel
+      const width = ((task.endTime.getTime() - task.startTime.getTime()) / (1000 * 60 * 60)) * zoomLevel
+      
+      return !(startX + width < viewportLeft || startX > viewportRight)
+    })
+  }, [filteredTasks, timeRange, zoomLevel, ganttRef.current?.scrollLeft])
 
   // Apply filters and calculate time range
   useEffect(() => {

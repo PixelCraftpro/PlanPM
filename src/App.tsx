@@ -481,22 +481,9 @@ function GanttPlanner() {
   }, [])
 
   const handleDataImportedWithMapping = useCallback((data: any[], mapping: ColumnMapping) => {
-    console.log('🎯 handleDataImportedWithMapping wywołane:', {
-      dataLength: data.length,
-      mapping,
-      sampleData: data.slice(0, 2)
-    })
-    
     const parsedTasks = normalizeImportedData(data, mapping)
-    console.log('📈 Wynik parsowania:', {
-      parsedTasksLength: parsedTasks.length,
-      sampleTasks: parsedTasks.slice(0, 2)
-    })
-    
     setTasks(parsedTasks)
     setTimeRange(null) // Reset time range to auto-calculate
-    
-    console.log('✅ Zadania ustawione w state')
   }, [])
 
   const handleDemoData = useCallback(() => {

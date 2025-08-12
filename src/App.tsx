@@ -31,7 +31,7 @@ import { hashColor } from './utils/colorUtils'
 const parseDate = (dateStr: string): Date | null => {
   if (!dateStr) return null
   
-  console.log('🔍 Parsowanie daty:', dateStr)
+  // console.log('🔍 Parsowanie daty:', dateStr) // Wyłączam verbose logging
   
   // Try parsing as timestamp first
   const timestamp = parseInt(dateStr)
@@ -43,7 +43,7 @@ const parseDate = (dateStr: string): Date | null => {
   try {
     const isoDate = parseISO(dateStr)
     if (isValid(isoDate)) {
-      console.log('✅ Sparsowano jako ISO:', isoDate)
+      // console.log('✅ Sparsowano jako ISO:', isoDate)
       return isoDate
     }
   } catch {}
@@ -54,27 +54,35 @@ const parseDate = (dateStr: string): Date | null => {
     'dd.MM.yyyy HH:mm:ss',
     'dd.MM.yyyy H:mm',
     'dd.MM.yyyy H:mm:ss',
+    'dd.MM.yyyy HH:mm:ss',
+    'dd.MM.yyyy H:mm:ss',
+    'dd/MM/yyyy HH:mm:ss',
+    'dd/MM/yyyy H:mm:ss',
     'yyyy-MM-dd HH:mm',
     'yyyy-MM-dd H:mm',
+    'yyyy-MM-dd HH:mm:ss',
+    'yyyy-MM-dd H:mm:ss',
     'dd/MM/yyyy HH:mm',
     'dd/MM/yyyy H:mm',
     'MM/dd/yyyy HH:mm',
     'MM/dd/yyyy H:mm',
     'dd.MM.yyyy',
-    'yyyy-MM-dd'
+    'yyyy-MM-dd',
+    'dd-MM-yyyy HH:mm',
+    'dd-MM-yyyy H:mm'
   ]
   
   for (const formatStr of formats) {
     try {
       const parsed = parse(dateStr, formatStr, new Date())
       if (isValid(parsed)) {
-        console.log(`✅ Sparsowano jako ${formatStr}:`, parsed)
+        // console.log(`✅ Sparsowano jako ${formatStr}:`, parsed)
         return parsed
       }
     } catch {}
   }
   
-  console.log('❌ Nie udało się sparsować daty:', dateStr)
+  console.warn('❌ Nie udało się sparsować daty:', dateStr)
   return null
 }
 
@@ -394,7 +402,8 @@ function GanttPlanner() {
     console.log('🔄 Filtrowanie zadań:', {
       totalTasks: tasks.length,
       selectedResources: selectedResources.length,
-      searchQuery
+      searchQuery,
+      sampleTasks: tasks.slice(0, 2)
     })
     
     let filtered = tasks
@@ -481,9 +490,22 @@ function GanttPlanner() {
   }, [])
 
   const handleDataImportedWithMapping = useCallback((data: any[], mapping: ColumnMapping) => {
+    console.log('🎯 handleDataImportedWithMapping wywołane:', {
+      dataLength: data.length,
+      mapping,
+      sampleData: data.slice(0, 2)
+    })
+    
     const parsedTasks = normalizeImportedData(data, mapping)
+    console.log('📈 Wynik parsowania:', {
+      parsedTasksLength: parsedTasks.length,
+      sampleTasks: parsedTasks.slice(0, 2)
+    })
+    
     setTasks(parsedTasks)
     setTimeRange(null) // Reset time range to auto-calculate
+    
+    console.log('✅ Zadania ustawione w state')
   }, [])
 
   const handleDemoData = useCallback(() => {

@@ -132,7 +132,7 @@ const normalizeImportedData = (data: any[], mapping?: ColumnMapping): Task[] => 
   
   data.forEach((row, index) => {
     const orderNo = row[columnMap.orderno] || row['Order No.'] || ''
-    const resource = row[columnMap.resource] || row['Resource'] || ''
+    const resource = String(row[columnMap.resource] || row['Resource'] || '')
     const startTimeStr = row[columnMap.starttime] || row['Start Time'] || ''
     const endTimeStr = row[columnMap.endtime] || row['End Time'] || ''
     const qtyStr = row[columnMap.qty] || row['Qty.'] || ''
